@@ -11,7 +11,7 @@ f) See iGraph script.
 
 ### Figure 2
 b-i) Standard Seurat single-cell RNA sequencing analysis workflow. 
-See Supp. Tables 5-7 for quality control thresholds, cluster markers, and gene sets.
+See Supp. Tables 5-7.
 
 ### Figure 3
 a-h) See CellChat script.
