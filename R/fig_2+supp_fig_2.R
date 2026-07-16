@@ -8,466 +8,56 @@ library(dplyr)
 library(Seurat)
 library(patchwork)
 
-# Load the combined dataset. In CellRanger /outs/raw_feature_bc_matrix or filtered_feature_bc_matrix
-#Contains barcodes.tsv, features.tsv, and matrix.mtx
-combined.data <- Read10X(data.dir = "~/DowningLab_Git/AQPhan/filtered_gene_bc_matrices/hg19/")
+########################### Data processing and QC ###########################
+
+# Load an individual dataset. Change path for other days or conditions.
+# Contains barcodes.tsv, features.tsv, and matrix.mtx
+combined.data <- Read10X(data.dir = "~/D12_S3/filtered_gene_bc_matrices/hg19/")
 
 # Initialize the Seurat object with the raw (non-normalized data)
-combined <- CreateSeuratObject(counts = combined.data, project = "combined3k", min.cells = 3, min.features = 200)
+combined <- CreateSeuratObject(counts = combined.data, project = "SHROOM3 KD", min.cells = 3, min.features = 200)
 combined
 
-########################### QC and selecting cells for further analysis ###########################
-
-# The [[ operator can add columns to object metadata. This is a great place to stash QC stats
+# Add mitochondrial percent metadata column for filtering
 combined[["percent.mt"]] <- PercentageFeatureSet(combined, pattern = "^MT-")
 
-# Visualize QC metrics as a violin plot
-VlnPlot(combined, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-
-# FeatureScatter is typically used to visualize feature-feature relationships, but can be used
-# for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
-
-plot1 <- FeatureScatter(combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
-plot2 <- FeatureScatter(combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-plot1 + plot2
-
-#filter cells that have unique feature counts over 2,500 or less than 200
-#filter cells that have >5% mitochondrial counts
+# Filter cells that have unique feature counts over 2,500 or less than 200
+# Filter cells that have >5% mitochondrial counts
 combined <- subset(combined, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
 
-########################### Normalizing the data ###########################
-
-#use "LogNormalize" method by default. normalizes the feature expression measurements for each cell by the total expression,
-#multiplies this by a scale factor (10,000 by default), and log-transforms the result
-#Normalized values are stored in combined[["RNA"]]@data
+# Normalize
 combined <- NormalizeData(combined, normalization.method = "LogNormalize", scale.factor = 10000)
 
-#combined <- NormalizeData(combined) #same as above line, not as explicit with defaults
-
-########################### Identification of highly variable features (feature selection) ###########################
-
-#calculate a subset of features that exhibit high cell-to-cell variation in the dataset. (2000 features returned is default)
-#(i.e, they are highly expressed in some cells, and lowly expressed in others) (https://www.nature.com/articles/nmeth.2645) (https://www.biorxiv.org/content/early/2018/11/02/460147.full.pdf)
+# Identify variable features and scale
 combined <- FindVariableFeatures(combined, selection.method = "vst", nfeatures = 2000)
+combined <- ScaleData(combined, features = rownames(combined))
 
-# Identify the 10 most highly variable genes
-top10 <- head(VariableFeatures(combined), 10)
-
-# plot variable features with and without labels
-plot1 <- VariableFeaturePlot(combined)
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-plot1 + plot2
-
-########################### Scaling the data ###########################
-
-#apply a linear transformation ('scaling') that is a standard pre-processing step prior to dimensional reduction techniques, like PCA
-#Shifts the expression of each gene, so that the mean expression across cells is 0
-#Scales the expression of each gene, so that the variance across cells is 1 (This step gives equal weight in downstream analyses, so that highly-expressed genes do not dominate)
-#The results of this are stored in combined[["RNA"]]@scale.data
-all.genes <- rownames(combined)
-combined <- ScaleData(combined, features = all.genes)
-
-#can remove unwanted sources of variation too, see https://satijalab.org/seurat/v3.2/combined3k_tutorial.html
-
-
-########################### Perform linear dimensional reduction ###########################
-
-#perform PCA on the scaled data. only the previously determined variable features are used as input, default, but can be defined using features argument
+# Perform PCA on the scaled data
 combined <- RunPCA(combined, features = VariableFeatures(object = combined))
 
-# Examine and visualize PCA results a few different ways
-print(combined[["pca"]], dims = 1:5, nfeatures = 5)
-VizDimLoadings(combined, dims = 1:2, reduction = "pca")
-DimPlot(combined, reduction = "pca")
-DimHeatmap(combined, dims = 1, cells = 500, balanced = TRUE) #allows for easy exploration of the primary sources of heterogeneity in a dataset, and can be useful when trying to decide which PCs to include for further downstream analyses
-#Setting cells to a number plots the 'extreme' cells on both ends of the spectrum, which dramatically speeds plotting for large datasets
-DimHeatmap(combined, dims = 1:15, cells = 500, balanced = TRUE) #displays PCs 1 through 15
-
-
-########################### Determine the 'dimensionality' of the dataset ###########################
-
-#To overcome the extensive technical noise in any single feature for scRNA-seq data, Seurat clusters cells based on their PCA scores, with each PC essentially representing a 'metafeature' that combines information across a correlated feature set. The top principal components therefore represent a robust compression of the dataset.
-
-#randomly permute a subset of the data (1% by default) and rerun PCA, constructing a 'null distribution' of feature scores, and repeat this procedure. Identifies 'significant' PCs as those who have a strong enrichment of low p-value features
-
-# NOTE: This process can take a long time for big datasets, comment out for expediency. More
-# approximate techniques such as those implemented in ElbowPlot() can be used to reduce
-# computation time
-combined <- JackStraw(combined, num.replicate = 100)
-combined <- ScoreJackStraw(combined, dims = 1:20)
-
-#provides a visualization tool for comparing the distribution of p-values for each PC with a uniform distribution (dashed line) 
-#'Significant' PCs will show a strong enrichment of features with low p-values (solid curve above the dashed line)
-JackStrawPlot(combined, dims = 1:15)
-
-#alternatively, can use elbow plot to find inflection point
-ElbowPlot(combined)
-
-#NOTES: 
-#-encourage users to repeat downstream analyses with a different number of PCs. often do not differ dramatically
-#-advise users to err on the higher side when choosing this parameter. For example, performing downstream analyses with only 5 PCs does significantly and adversely affect results
-
-########################### Cluster the cells ###########################
-
-#first construct a KNN graph based on the euclidean distance in PCA space, and refine the edge weights between any two cells based on the shared overlap in their local neighborhoods (Jaccard similarity)
+# Cluster the cells
 combined <- FindNeighbors(combined, dims = 1:10)
-#next apply modularity optimization techniques such as the Louvain algorithm, to iteratively group cells together, with the goal of optimizing the standard modularity function
-#resolution or granularity is typically good between 0.4-1.2
-combined <- FindClusters(combined, resolution = 0.5)
-
 combined <- FindClusters(combined, resolution = 0.44) #res of 0.43 or 0.44 makes 9 clusters. 0.44 a little cleaner
 
-
-# Look at cluster IDs of the first 5 cells
-head(Idents(combined), 5)
-
-# If you haven't installed UMAP, you can do so via reticulate::py_install(packages = 'umap-learn')
+# Run and visualize UMAP
 combined <- RunUMAP(combined, dims = 1:10)
-
-# note that you can set `label = TRUE` or use the LabelClusters function to help label
-# individual clusters
 DimPlot(combined, reduction = "umap")
 
-#to save plot
-#saveRDS(combined, file = "../output/combined_tutorial.rds")
-
-
 ########################### Finding differentially expressed features (cluster biomarkers) ###########################
-#find markers that define clusters via differential expression (identifies pos. and neg. markers of a cluster compared to all other cells by default, ident.1)
-#min.pct argument requires a feature to be detected at a minimum percentage in either of the two groups of cells, and the thresh.test argument requires a feature to be differentially expressed (on average) by some amount between the two groups
 
-# find all markers of cluster 1
-cluster1.markers <- FindMarkers(combined, ident.1 = 1, min.pct = 0.25)
-head(cluster1.markers, n = 5)
-
-# find all markers distinguishing cluster 5 from clusters 0 and 3
-cluster5.markers <- FindMarkers(combined, ident.1 = 5, ident.2 = c(0, 3), min.pct = 0.25)
-head(cluster5.markers, n = 5)
-
-# find markers for every cluster compared to all remaining cells, report only the positive ones
-combined.markers <- FindAllMarkers(combined, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-combined.markers %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
-
-#ROC test returns the 'classification power' for any individual marker (ranging from 0 - random, to 1 - perfect)
-cluster1.markers <- FindMarkers(combined, ident.1 = 0, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
-
-#violin plot of probability distributions of marker expressions
-VlnPlot(combined, features = c("MS4A1", "CD79A"))
-
-#you can plot raw counts as well
-VlnPlot(combined, features = c("NKG7", "PF4"), slot = "counts", log = TRUE)
-
-################ Fibroblasts ##############
-#Cluster 3
-FeaturePlot(combined, features = c("CAV1", "TFPI2", "COL5A2", "COL3A1", "COL6A2", "CYTL1", "TWIST1", "NUPR1", "CDKN1A", "CDK6", "PDGFRA", "DDR2", "SFRP1"))
-
-#Cluster 0
-FeaturePlot(combined, features = c("COL5A2", "COL3A1", "CYTL1", "TWIST1", "NUPR1", "CDKN1A", "CDK6"))
-FeaturePlot(combined, features = c("TFPI2"))
-
-
-#####################
-
-############# Neural ###########
-
-#neural; BMP4: neuronal fate commitment/differentiation. Other BMPs: neuronal or dendrite development
-#FeaturePlot(combined, features = c("NOTCH1", "TGFB2", "HES1", "OCLN", "SYT11", "DLX2", "AXL", "BMP4", "BMP5", "BMP6", "BMP7", "NFASC", "NGFR"))
-FeaturePlot(combined, features = c("NEUROG3", "NEUROD1", "NEUROD4", "NEUROG1", "POU3F2", "NHLH1", "NHLH2")) #Neural spike
-#FeaturePlot(combined, features = c("NEFL", "NEFM", "NEXN")) #transition to neuronal?
-
-FeaturePlot(combined, features = c("CITED2", "CUL3", "HOPX", "SP3", "JUNB"))
-##############
-
-########### Pluripotency #############
-
-#CLDN7, CRB3 epithelial markers critical for MET found in iPSC cluster
-
-#Primed Pluripotency Upregulated https://www.nature.com/articles/s41598-018-24051-5
-FeaturePlot(combined, features = c("LEFTY1", "LEFTY2", "TGFB1", "INHBA", "FURIN")) #EpiSCs upregulated TGF-beta
-FeaturePlot(combined, features = c("PDGFRA")) #LINEAGE SPECIFIC
-FeaturePlot(combined, features = c("FGFR1", "DUSP6")) # FGF signaling
-
-#Ground Naive Pluripotency Upregulated https://www.nature.com/articles/s41598-018-24051-5
-FeaturePlot(combined, features = c("DPPA3", "DNMT3L", "DPPA5", "ZFP42")) #DPPA5, DNMT3L (https://www.cell.com/cell-reports/pdfExtended/S2211-1247(18)32074-6) DPPA3, ZFP42 (https://www.nature.com/articles/s41598-018-24051-5)
-
-#Naive LIF+Serum https://www.nature.com/articles/s41598-018-24051-5
-FeaturePlot(combined, features = c("ZSCAN4", "ID1", "SYCP3", "UTF1"))
-FeaturePlot(combined, features = c("CALD1"))
-
-FeaturePlot(combined, features = c("NODAL")) #IN AND OUT, MORE OUTER
-FeaturePlot(combined, features = c("TDGF1")) #IN AND OUT
-FeaturePlot(combined, features = c("EPCAM")) #IN AND OUT
-FeaturePlot(combined, features = c("LIN28A")) #IN AND OUT
-FeaturePlot(combined, features = c("DPPA3")) #INNER
-FeaturePlot(combined, features = c("UTF1")) #IN AND OUT, POTENTIALLY MORE INNER
-FeaturePlot(combined, features = c("LEFTY2")) #OUTER, NOT AT INNERMOST iPSC
-FeaturePlot(combined, features = c("DNMT3B")) #IN AND OUT, MORE INNER
-FeaturePlot(combined, features = c("NANOG")) #IN AND OUT
-FeaturePlot(combined, features = c("DPPA2")) #INNER
-FeaturePlot(combined, features = c("LEFTY1")) #OUTER, LIKE LEFTY2
-FeaturePlot(combined, features = c("TET1")) #IN AND OUT
-FeaturePlot(combined, features = c("CDH1")) #IN AND OUT
-FeaturePlot(combined, features = c("FOXH1")) #IN AND OUT
-FeaturePlot(combined, features = c("DPPA5")) #INNER
-FeaturePlot(combined, features = c("DNMT3L")) #INNER
-FeaturePlot(combined, features = c("LIN28B")) #IN AND OUT
-FeaturePlot(combined, features = c("TEAD4")) #IN AND OUT
-FeaturePlot(combined, features = c("ITGB5")) #OUTER
-FeaturePlot(combined, features = c("DNMT3A")) #IN AND OUT
-FeaturePlot(combined, features = c("SALL4")) #IN AND OUT
-#################
-
-############# Neural Crest and SMCs ##############
-#Neuralepithelium/Neural Crest Markers - Bottom right of Cluster 1 https://www.nature.com/articles/cr201211
-FeaturePlot(combined, features = c("HES1", "OCLN", "CDH1", "NES", "SOX9", "NGFR", "HOXA5", "HOXD9"))
-combined2 = AddModuleScore(combined, features = list(c("HES1", "OCLN", "NGFR", "NES", "HOXA5", "HOXD9")), name = "Neural.Crest")
-FeaturePlot(combined2, features = c("Neural.Crest1"))
-#Markers for CNS, should not be present in NCC https://www.nature.com/articles/srep19727
-FeaturePlot(combined, features = c("HES5", "PAX6", "DACH1", "SOX1"))
-
-#NCC markers from pluripotency to differentiation and migration
-FeaturePlot(combined2, features = c("CCND1", "E2F1")) #proliferation markers in NCCs
-FeaturePlot(combined2, features = c("POU5F1", "NANOG")) #medially located pluripotency NCC marker https://www.nature.com/articles/s41467-017-01561-w
-#FeaturePlot(combined2, features = c("SOX2", "MSI1")) #laterally located pluripotency neural stem cell marker https://www.nature.com/articles/s41467-017-01561-w
-FeaturePlot(combined2, features = c("KRT19")) #migratory NCC marker https://www.nature.com/articles/s41467-017-01561-w
-FeaturePlot(combined, features = c("COL2A1", "TFAP2A")) #NCC migration/differentiation. Does not overlap with pluripotent NCCs https://www.nature.com/articles/s41467-017-01561-w
-
-FeaturePlot(combined, features = c("AKT1", "AKT2", "ARPP19", "C1QTNF2", "CD36", "DGAT2", "DYRK2", "EPM2AIP1", "FOXO1", "GPLD1", "GPT2", "HIF1A", "HMGB1", "IGF1", "INSR")) # ARPP19 LEFT SIDE C1QTNF2 TOP CD36 FIBROBLASTS DGAT2 BOTTOM RIGHT GPLD1 BOTTLENECK/NCCS GPT2 iPSCs+NCCs HMGB1 proliferation+iPSC IGF1 MIGRATORY NCCs INSR iPSCs IRS1 SMCs
-FeaturePlot(combined, features = c("IRS1")) # https://www.nature.com/articles/s41467-017-01561-w
-
-FeaturePlot(combined, features = c("ACTA2")) 
-
-
-#Markers for Trunk NCCs https://www.nature.com/articles/srep19727
-FeaturePlot(combined, features = c("HOXA5", "HOXD9"))
-
-#NCC Border Specifier Genes https://www.sciencedirect.com/science/article/pii/S0012160610002988
-FeaturePlot(combined, features = c("MSX1", "ZIC1")) 
-
-FeaturePlot(combined, features = c("COL2A1")) #NCC migration/differentiation. Does not overlap with pluripotent NCCs https://www.nature.com/articles/s41467-017-01561-w
-
-
-#Smooth Muscle Cell Markers Top left of Cluster 1
-FeaturePlot(combined, features = c("ACTA2", "TAGLN", "MYL9", "ID3", "ACTC1"))
-combined2 = AddModuleScore(combined, features = list(c("ACTA2", "TAGLN", "MYL9", "ID3", "ACTC1")), name = "SMC")
-FeaturePlot(combined2, features = c("SMC1"))
-
-####################
-
-########### Epithelial Cell #########
-FeaturePlot(combined2, features = c("EPCAM", "KRT8", "KRT18", "FBP1", "OCLN")) #KRT8/18 https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00705-0
-FeaturePlot(combined2, features = c("EED")) #NT5E THY1 ENG 
-###################
-
-########## Trophoblast########
-FeaturePlot(combined2, features = c("EED", "ID1", "ID2", "ETS2"))
-FeaturePlot(combined2, features = c("CCNB1"))
-
-###################
-
-############# ZGA ###########
-
-FeaturePlot(combined2, features = c("CCNB1"))
-FeaturePlot(combined2, features = c("CCNB1"))
-
-###############
-
-#generates an expression heatmap for given cells and features. ex: top 20 markers
-top10 <- combined.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-DoHeatmap(combined, features = top10$gene) + NoLegend()
-
-########################### Assigning cell type identity to clusters ###########################
-
-new.cluster.ids <- c("Naive CD4 T", "Memory CD4 T", "CD14+ Mono", "B", "CD8 T", "FCGR3A+ Mono", "NK", "DC", "Platelet", "lol")
-names(new.cluster.ids) <- levels(combined)
-combined <- RenameIdents(combined, new.cluster.ids)
-DimPlot(combined, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
-
-#to save
-#saveRDS(combined, file = "../output/combined3k_final.rds")
-
-metadata <- combined@meta.data
-
-metadata %>% 
-  ggplot(aes(color=seurat_clusters, x=nCount_RNA, fill= seurat_clusters)) + 
-  geom_density(alpha = 0.2) + 
-  scale_x_log10() + 
-  theme_classic() +
-  ylab("Cell density") +
-  geom_vline(xintercept = 500)
-
-
-combined <- RenameIdents(object = combined, `0` = "Fibr.", `1` = "NCCs", `2` = "Prolif.Troph.", `3` = "cIMHC Neg.", `4` = "Epi.", `5` = "iPSCs",  `6` = "Troph.", `7` = "Neur.Epi.", `8` = "SMCs", `9` = "Neur.")
-
-#function to create split violin plots with ggplot2
-#https://stackoverflow.com/questions/35717353/split-violin-plot-with-ggplot2
-GeomSplitViolin <- ggproto("GeomSplitViolin", GeomViolin,
-                           draw_group = function(self, data, ..., draw_quantiles = NULL) {
-                             data <- transform(data, xminv = x - violinwidth * (x - xmin), xmaxv = x + violinwidth * (xmax - x))
-                             grp <- data[1, "group"]
-                             newdata <- plyr::arrange(transform(data, x = if (grp %% 2 == 1) xminv else xmaxv), if (grp %% 2 == 1) y else -y)
-                             newdata <- rbind(newdata[1, ], newdata, newdata[nrow(newdata), ], newdata[1, ])
-                             newdata[c(1, nrow(newdata) - 1, nrow(newdata)), "x"] <- round(newdata[1, "x"])
-
-                             if (length(draw_quantiles) > 0 & !scales::zero_range(range(data$y))) {
-                               stopifnot(all(draw_quantiles >= 0), all(draw_quantiles <=
-                                                                         1))
-                               quantiles <- ggplot2:::create_quantile_segment_frame(data, draw_quantiles)
-                               aesthetics <- data[rep(1, nrow(quantiles)), setdiff(names(data), c("x", "y")), drop = FALSE]
-                               aesthetics$alpha <- rep(1, nrow(quantiles))
-                               both <- cbind(quantiles, aesthetics)
-                               quantile_grob <- GeomPath$draw_panel(both, ...)
-                               ggplot2:::ggname("geom_split_violin", grid::grobTree(GeomPolygon$draw_panel(newdata, ...), quantile_grob))
-                             }
-                             else {
-                               ggplot2:::ggname("geom_split_violin", GeomPolygon$draw_panel(newdata, ...))
-                             }
-                           })
-
-geom_split_violin <- function(mapping = NULL, data = NULL, stat = "ydensity", position = "identity", ...,
-                              draw_quantiles = NULL, trim = TRUE, scale = "width", na.rm = FALSE,
-                              show.legend = NA, inherit.aes = TRUE) {
-  layer(data = data, mapping = mapping, stat = stat, geom = GeomSplitViolin,
-        position = position, show.legend = show.legend, inherit.aes = inherit.aes,
-        params = list(trim = trim, scale = scale, draw_quantiles = draw_quantiles, na.rm = na.rm, ...))
-}
-
-########################### QC and selecting cells for further analysis ###########################
-
-# The [[ operator can add columns to object metadata. This is a great place to stash QC stats
-combined[["percent.mt"]] <- PercentageFeatureSet(combined, pattern = "^MT-")
-
-# Visualize QC metrics as a violin plot
-VlnPlot(combined, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-
-# FeatureScatter is typically used to visualize feature-feature relationships, but can be used
-# for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
-
-plot1 <- FeatureScatter(combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
-plot2 <- FeatureScatter(combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-plot1 + plot2
-
-#filter cells that have unique feature counts over 2,500 or less than 200
-#filter cells that have >5% mitochondrial counts
-combined <- subset(combined, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
-
-########################### Normalizing the data ###########################
-
-#use "LogNormalize" method by default. normalizes the feature expression measurements for each cell by the total expression,
-#multiplies this by a scale factor (10,000 by default), and log-transforms the result
-#Normalized values are stored in combined[["RNA"]]@data
-combined <- NormalizeData(combined, normalization.method = "LogNormalize", scale.factor = 10000)
-
-#combined <- NormalizeData(combined) #same as above line, not as explicit with defaults
-
-########################### Identification of highly variable features (feature selection) ###########################
-
-#calculate a subset of features that exhibit high cell-to-cell variation in the dataset. (2000 features returned is default)
-#(i.e, they are highly expressed in some cells, and lowly expressed in others) (https://www.nature.com/articles/nmeth.2645) (https://www.biorxiv.org/content/early/2018/11/02/460147.full.pdf)
-combined <- FindVariableFeatures(combined, selection.method = "vst", nfeatures = 2000)
-
-# Identify the 10 most highly variable genes
-top10 <- head(VariableFeatures(combined), 10)
-
-# plot variable features with and without labels
-plot1 <- VariableFeaturePlot(combined)
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-plot1 + plot2
-
-########################### Scaling the data ###########################
-
-#apply a linear transformation ('scaling') that is a standard pre-processing step prior to dimensional reduction techniques, like PCA
-#Shifts the expression of each gene, so that the mean expression across cells is 0
-#Scales the expression of each gene, so that the variance across cells is 1 (This step gives equal weight in downstream analyses, so that highly-expressed genes do not dominate)
-#The results of this are stored in combined[["RNA"]]@scale.data
-all.genes <- rownames(combined)
-combined <- ScaleData(combined, features = all.genes)
-
-#can remove unwanted sources of variation too, see https://satijalab.org/seurat/v3.2/combined3k_tutorial.html
-
-
-########################### Perform linear dimensional reduction ###########################
-
-#perform PCA on the scaled data. only the previously determined variable features are used as input, default, but can be defined using features argument
-combined <- RunPCA(combined, features = VariableFeatures(object = combined))
-
-# Examine and visualize PCA results a few different ways
-print(combined[["pca"]], dims = 1:5, nfeatures = 5)
-VizDimLoadings(combined, dims = 1:2, reduction = "pca")
-DimPlot(combined, reduction = "pca")
-DimHeatmap(combined, dims = 1, cells = 500, balanced = TRUE) #allows for easy exploration of the primary sources of heterogeneity in a dataset, and can be useful when trying to decide which PCs to include for further downstream analyses
-#Setting cells to a number plots the 'extreme' cells on both ends of the spectrum, which dramatically speeds plotting for large datasets
-DimHeatmap(combined, dims = 1:15, cells = 500, balanced = TRUE) #displays PCs 1 through 15
-
-
-########################### Determine the 'dimensionality' of the dataset ###########################
-
-#To overcome the extensive technical noise in any single feature for scRNA-seq data, Seurat clusters cells based on their PCA scores, with each PC essentially representing a 'metafeature' that combines information across a correlated feature set. The top principal components therefore represent a robust compression of the dataset.
-
-#randomly permute a subset of the data (1% by default) and rerun PCA, constructing a 'null distribution' of feature scores, and repeat this procedure. Identifies 'significant' PCs as those who have a strong enrichment of low p-value features
-
-# NOTE: This process can take a long time for big datasets, comment out for expediency. More
-# approximate techniques such as those implemented in ElbowPlot() can be used to reduce
-# computation time
-combined <- JackStraw(combined, num.replicate = 100)
-combined <- ScoreJackStraw(combined, dims = 1:20)
-
-#provides a visualization tool for comparing the distribution of p-values for each PC with a uniform distribution (dashed line)
-#'Significant' PCs will show a strong enrichment of features with low p-values (solid curve above the dashed line)
-JackStrawPlot(combined, dims = 1:15)
-
-#alternatively, can use elbow plot to find inflection point
-ElbowPlot(combined)
-
-#NOTES:
-#-encourage users to repeat downstream analyses with a different number of PCs. often do not differ dramatically
-#-advise users to err on the higher side when choosing this parameter. For example, performing downstream analyses with only 5 PCs does significantly and adversely affect results
-
-########################### Cluster the cells ###########################
-
-#first construct a KNN graph based on the euclidean distance in PCA space, and refine the edge weights between any two cells based on the shared overlap in their local neighborhoods (Jaccard similarity)
-combined <- FindNeighbors(combined, dims = 1:20)
-#next apply modularity optimization techniques such as the Louvain algorithm, to iteratively group cells together, with the goal of optimizing the standard modularity function
-#resolution or granularity is typically good between 0.4-1.2
-combined <- FindClusters(combined, resolution = 0.44) #res of 0.43 or 0.44 makes 9 clusters. 0.44 a little cleaner
-
-# note that you can set `label = TRUE` or use the LabelClusters function to help label
-# individual clusters
-DimPlot(combined, reduction = "umap")
-
-md <- combined@meta.data %>% as.data.table
-md[, .N, by = c("Condition")]
-
-#to save plot
-#saveRDS(combined, file = "../output/combined_tutorial.rds")
-
-
-########################### Finding differentially expressed features (cluster biomarkers) ###########################
-#find markers that define clusters via differential expression (identifies pos. and neg. markers of a cluster compared to all other cells by default, ident.1)
-#min.pct argument requires a feature to be detected at a minimum percentage in either of the two groups of cells, and the thresh.test argument requires a feature to be differentially expressed (on average) by some amount between the two groups
-
-# find markers for every cluster compared to all remaining cells, report only the positive ones
+# Find markers for every cluster compared to all remaining cells, report only the positive ones
 plan("multiprocess", workers = 24)
 combined.markers <- FindAllMarkers(combined, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
 combined.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC) -> top10
 x <- DoHeatmap(combined, features = clusterMarkers) + scale_fill_gradientn(colors = c(rev(brewer.pal(n = 11, name = "RdBu")))) + NoLegend()
 x <- DoMultiBarHeatmap(combined, features = top10$gene, additional.group.by = c("Time", "Condition")) + scale_fill_gradientn(colors = c(rev(brewer.pal(n = 11, name = "RdBu"))))
 show(x)
-#fwrite(combined.markers, file = "/home/aqphan/DowningLab_Git/AQPhan/scRNA-seq/allClusterMarkers.txt", sep = "\t")
 
 #SMC NCC NEURAL iPSC EPI TROPH FIBR NEUROEPI
 clusterMarkers = c("ACTA2", "TAGLN", "SOX9", "NEUROD1", "CDH1", "NANOG", "KRT8", "EPCAM", "CENPF", "BIRC5", "CAV1", "PAK1", "CRABP1", "CRYAB")
 
 #ROC test returns the 'classification power' for any individual marker (ranging from 0 - random, to 1 - perfect)
 cluster1.markers <- FindMarkers(combined, ident.1 = 0, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
-
-#violin plot of probability distributions of marker expressions
-VlnPlot(combined, features = c("MS4A1", "CD79A"))
-VlnPlot(combined, features = c("SHROOM3")) + NoLegend()
-
-
-#you can plot raw counts as well
-VlnPlot(combined, features = c("SHROOM3"), slot = "counts", log = TRUE)
 
 ################ Fibroblasts ##############
 #Cluster 3
@@ -476,25 +66,6 @@ FeaturePlot(combined, features = c("CAV1", "TFPI2", "COL5A2", "COL3A1", "COL6A2"
 #Cluster 0
 FeaturePlot(combined, features = c("COL5A2", "COL3A1", "CYTL1", "TWIST1", "NUPR1", "CDKN1A", "CDK6", "COL3A1"))
 FeaturePlot(combined, features = c("S100A4"))
-
-
-#####################
-
-
-#UMAP sorted by timepoint of both conditions together
-#Change alpha of points: https://github.com/satijalab/seurat/issues/2835
-del = DimPlot(combined, reduction = "umap", shuffle = T, seed = 1, group.by = "Time", pt.size = .1, label = F)
-del[[1]]$layers[[1]]$aes_params$alpha = .6
-del
-
-#UMAP sorted by condition together
-del = DimPlot(combined, reduction = "umap", group.by = "Condition", seed = 1, shuffle = T, pt.size = .1, label = F)
-del[[1]]$layers[[1]]$aes_params$alpha = .4
-del
-
-#UMAP split by condition. could downsample so S3 looks similar to LacZ
-del = DimPlot(combined, reduction = "umap", split.by = "Condition", pt.size = .1, label = F)
-del
 
 ############# Neural ###########
 
@@ -1343,53 +914,3 @@ fano_gene_clusters = list(pos = subset(dif_cv, dFano > 0), neg = subset(dif_cv, 
 
 # write.xlsx(fano_gene_clusters[[1]], file="/home/data/aqphan/RStudio/DowningLab_Git/fano_gene_clusters.xlsx", sheetName="pos", row.names=FALSE)
 # write.xlsx(fano_gene_clusters[[2]], file="/home/data/aqphan/RStudio/DowningLab_Git/fano_gene_clusters.xlsx", sheetName="neg", append=TRUE, row.names=FALSE)
-
-####################### DEG and GSEA ###################
-
-library(msigdbr)
-library(fgsea)
-library(ggpubr)
-
-#tutorial: https://nbisweden.github.io/workshop-scRNAseq/labs/compiled/seurat/seurat_05_dge.html#Gene_Set_Enrichment_Analysis_(GSEA)
-
-#identify differentially expressed genes of cell types between LacZ and S3 KD
-nccMarkers = FindMarkers(combined, ident.1 = "Shroom3", ident.2 = "LacZ", group.by = 'Condition', subset.ident = 'NCCs')
-iMarkers = FindMarkers(combined, ident.1 = "Shroom3", ident.2 = "LacZ", group.by = 'Condition', subset.ident = 'iPSCs')
-
-#Create a gene rank based on the gene expression fold change
-markers = iMarkers #nccMarkers
-gene_rank <- setNames(markers$avg_log2FC, casefold(rownames(markers), upper = T))
-
-# Download gene sets
-msigdbgmt <- msigdbr::msigdbr("Homo sapiens")
-msigdbgmt <- as.data.frame(msigdbgmt)
-
-# List available gene sets
-unique(msigdbgmt$gs_subcat)
-
-#subset gene sets of interest
-sets = c("GO:BP")#, "CP:KEGG", "CP:REACTOME", "CP:WIKIPATHWAYS")
-sets = c("CP:WIKIPATHWAYS")
-
-msigdbgmt_subset <- msigdbgmt[msigdbgmt$gs_subcat %in% sets, ]
-gmt <- lapply(unique(msigdbgmt_subset$gs_name), function(x) {
-  msigdbgmt_subset[msigdbgmt_subset$gs_name == x, "gene_symbol"]
-})
-
-names(gmt) <- unique(paste0(msigdbgmt_subset$gs_name, "_", msigdbgmt_subset$gs_exact_source))
-
-# Perform enrichment analysis
-fgseaRes <- fgsea(pathways = gmt, stats = gene_rank, minSize = 15)
-fgseaRes <- fgseaRes[order(fgseaRes$padj, decreasing = T), ]
-
-
-plotEnrichment(gmt[["GOBP_CENTRAL_NERVOUS_SYSTEM_DEVELOPMENT_GO:0007417"]],
-               gene_rank) + labs(title="Regulation of Binding")
-
-#GOBP_BIOLOGICAL_ADHESION_GO:0022610, GOBP_NEURON_DIFFERENTIATION_GO:0030182, GOBP_CELL_PROJECTION_ORGANIZATION_GO:0030030
-#GOBP_CENTRAL_NERVOUS_SYSTEM_DEVELOPMENT_GO:0007417, GOBP_NEUROGENESIS_GO:0022008
-
-
-top10_UP <- fgseaRes$pathway[1:2]
-dev.off()
-plotGseaTable(gmt, gene_rank, fgseaRes, gseaParam = 0.5)
