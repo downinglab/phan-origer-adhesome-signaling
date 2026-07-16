@@ -16,15 +16,8 @@ library(ComplexHeatmap)
 library(readr)
 library(tidyverse)
 
-#install.packages("Signac")
-
-#load in Seurat object of combined lacZ and S3 scRNA-seq
-load("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/Seurat/lacZ+S3_scRNAseq_reclustered.RData")
-#LacZcellchat <- readRDS("/home/aqphan/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/Changhan_Analysis/cellchat_LacZ.rds")
-#S3cellchat <- readRDS("/home/aqphan/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/Changhan_Analysis/cellchat_Schroom3.rds")
-#load("/home/aqphan/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/cellchat_finishedcomparativeanalysis_lacZvsS3.RData") #load in finished CellChat analysis
-#load in finished CellChat analysis with all DBs and all timepoints combined. no split fibr.
-load("~/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/ALLDB_L+S+combined.RDATA")
+# Load in Seurat object of combined lacZ and S3 scRNA-seq
+load("~/hiF-T_small.RDS")
 
 ########### netAnalysis_signalingRole_heatmap_topbar ###############
 #returns the top barplot matrix (each cell type incoming or outgoing signaling)
@@ -708,11 +701,11 @@ S3cellchat <- netClustering(S3cellchat, type = "structural")
 # Visualization in 2D-space
 netVisual_embedding(S3cellchat, type = "structural", label.size = 3.5)
 
-#saveRDS(LacZcellchat, file = "/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/CellChat/LacZcellchat_individual.rds")
-#saveRDS(S3cellchat, file = "/home/aqphan/DowningLab_Git/AQPhan/scRNA-seq/CellChat/S3cellchat_individual.rds")
+#saveRDS(LacZcellchat, file = "~/LacZcellchat_individual.rds")
+#saveRDS(S3cellchat, file = "~/S3cellchat_individual.rds")
 
-#saveRDS(LacZcellchat, file = "/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D9ALLDB_lacZ.RDS")
-#saveRDS(S3cellchat, file = "/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D9ALLDB_S3.RDS")
+#saveRDS(LacZcellchat, file = "~/D9ALLDB_lacZ.RDS")
+#saveRDS(S3cellchat, file = "~/D9ALLDB_S3.RDS")
 
 ##################### Merge the LacZ and S3 CellChat Objects After Individual Analysis #######################
 #create a merged CellChat object of LacZ and S3 conditions
@@ -735,8 +728,6 @@ cellchat = cellchatD6
 cellchat = cellchatD9
 cellchat = cellchatD12
 cellchat = cellchatD15
-
-#saveRDS(combined, file = "/home/aqphan/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/ALLDB_L+Scellchat_combined_splitFibr.rds")
 
 ############### COMPARATIVE CELLCHAT ANALYSIS ##################################################################
 ############### Predict general principles of cell-cell communication ###############
@@ -1159,7 +1150,7 @@ plotGeneExpression(cellchat, signaling = "NOTCH", colors.ggplot = T, split.plot 
 
 StackedVlnPlot(object = cellchat, features = "EPHA")
 
-#saveRDS(cellchat, file = "/home/aqphan/DowningLab_Git/AQPhan/scRNA-seq/CellChat/cellchat_finishedcomparisonAnalysis_lacZvsS3.rds")
+#saveRDS(cellchat, file = "~/cellchat_finishedcomparisonAnalysis_lacZvsS3.rds")
 
 ############## Analyze Day by Day Cell Signaling Interactions ###############
 
@@ -1239,10 +1230,10 @@ dev.new()
 rankNet(cellchat, sources.use = c(1,9), targets.use = c(1,9), stacked = T)
 
 ############ Create CellChat Objects per Day ###############
-# D6cellchat <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D6.rds")
-# D9cellchat <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D9.rds")
-# D12cellchat <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D12.rds")
-# D15cellchat <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D15.rds")
+# D6cellchat <- readRDS("~/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D6.rds")
+# D9cellchat <- readRDS("~/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D9.rds")
+# D12cellchat <- readRDS("~/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D12.rds")
+# D15cellchat <- readRDS("~/CellChat_Day_Objs_cell-cell+ECMonly/cellchat_D15.rds")
 
 #Create CellChat objects per day:
 #split the seurat by day
@@ -1356,23 +1347,23 @@ D15S3cellchat <- createCellChat(object = data.input, meta = meta, group.by = "id
 #Find Normalized Functional Similarity Values
 
 #load in individual cellchat objects that have been processed individually
-D6ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D6ALLDB_lacZ.RDS")
-D6ALLDB_S3 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D6ALLDB_S3.RDS")
+D6ALLDB_lacZ <- readRDS("~/D6ALLDB_lacZ.RDS")
+D6ALLDB_S3 <- readRDS("~/D6ALLDB_S3.RDS")
 
-D9ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D9ALLDB_lacZ.RDS")
-D9ALLDB_S3 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D9ALLDB_S3.RDS")
+D9ALLDB_lacZ <- readRDS("~/D9ALLDB_lacZ.RDS")
+D9ALLDB_S3 <- readRDS("~/D9ALLDB_S3.RDS")
 
-D12ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D12ALLDB_lacZ.RDS")
-D12ALLDB_S3 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D12ALLDB_S3.RDS")
+D12ALLDB_lacZ <- readRDS("~/D12ALLDB_lacZ.RDS")
+D12ALLDB_S3 <- readRDS("~/D12ALLDB_S3.RDS")
 
-D15ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D15ALLDB_lacZ.RDS")
-D15ALLDB_S3 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D15ALLDB_S3.RDS")
+D15ALLDB_lacZ <- readRDS("~/D15ALLDB_lacZ.RDS")
+D15ALLDB_S3 <- readRDS("~/D15ALLDB_S3.RDS")
 
 #load in cellchat objects that contain LacZ and S3 conditions combined per timepoint
-cellchatD6 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D6ALLDB_COMBINED.RDS")
-cellchatD9 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D9ALLDB_COMBINED.RDS")
-cellchatD12 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D12ALLDB_COMBINED.RDS")
-cellchatD15 <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D15ALLDB_COMBINED.RDS")
+cellchatD6 <- readRDS("~/D6ALLDB_COMBINED.RDS")
+cellchatD9 <- readRDS("~/D9ALLDB_COMBINED.RDS")
+cellchatD12 <- readRDS("~/D12ALLDB_COMBINED.RDS")
+cellchatD15 <- readRDS("~/D15ALLDB_COMBINED.RDS")
 
 d6similarity = SimilarityCompute(cellchatD6, type = "functional")
 d9similarity = SimilarityCompute(cellchatD9, type = "functional")
@@ -1405,7 +1396,7 @@ cellchatD9 = cellchat
 cellchatD12 = cellchat
 cellchatD15 = cellchat
 
-saveRDS(cellchatD9, file = "/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D12ALLDB_COMBINED_LIFTOVER.RDS")
+saveRDS(cellchatD9, file = "~/D12ALLDB_COMBINED_LIFTOVER.RDS")
 
 #Lift Up for Comparative
 #create combined cellchat objects
@@ -1441,7 +1432,7 @@ similarity_matrix_lift[4,2:ncol(similarity_matrix_lift)] = d15similarity[pathway
 norm_sim_mat_lift = similarity_matrix_lift/max(similarity_matrix_lift[,2:ncol(similarity_matrix_lift)]) #normalize to max value of signaling pathways
 norm_sim_mat_lift$Time = similarity_matrix_lift$Time #revert time to proper days again
 
-#save(similarity_matrix_lift, norm_sim_mat_lift, file = "/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/similaritymatrices_LIFTUP.RData")
+#save(similarity_matrix_lift, norm_sim_mat_lift, file = "~/similaritymatrices_LIFTUP.RData")
 
 # # Specify id.vars: the variables to keep but not split apart on
 # df = melt(norm_sim_mat, id.vars=c("Time"))
@@ -1452,10 +1443,10 @@ ggplot(data=melt(norm_sim_mat, id.vars=c("Time")), aes(x=Time, y=value, fill=var
 #Cell Type PCP Signaling Per Day
 
 #load in individual cellchat objects that have been processed individually
-D6ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D6ALLDB_lacZ.RDS")
-D9ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D9ALLDB_lacZ.RDS")
-D12ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D12ALLDB_lacZ.RDS")
-D15ALLDB_lacZ <- readRDS("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/CellChat/D15ALLDB_lacZ.RDS")
+D6ALLDB_lacZ <- readRDS("~/D6ALLDB_lacZ.RDS")
+D9ALLDB_lacZ <- readRDS("~/D9ALLDB_lacZ.RDS")
+D12ALLDB_lacZ <- readRDS("~/D12ALLDB_lacZ.RDS")
+D15ALLDB_lacZ <- readRDS("~/D15ALLDB_lacZ.RDS")
 
 sig = "NOTCH"
 pat = "incoming"
@@ -1465,17 +1456,17 @@ netAnalysis_signalingRole_heatmap_topbar(D12ALLDB_lacZ, pattern = pat, signaling
 netAnalysis_signalingRole_heatmap_topbar(D15ALLDB_lacZ, pattern = pat, signaling = sig, width = 5, height = 6)
 
 #read in tables of incoming/outgoing signaling values per day
-incomingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/ncWNT_incomingstrength_perday.csv")
-outgoingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/ncWNT_outgoingstrength_perday.csv")
+incomingdays <- read_csv("~/ncWNT_incomingstrength_perday.csv")
+outgoingdays <- read_csv("~/ncWNT_outgoingstrength_perday.csv")
 
-incomingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/FN1_incomingstrength_perday.csv")
-outgoingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/FN1_outgoingstrength_perday.csv")
+incomingdays <- read_csv("~/FN1_incomingstrength_perday.csv")
+outgoingdays <- read_csv("~/FN1_outgoingstrength_perday.csv")
 
-incomingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/EPHA_incomingstrength_perday.csv")
-outgoingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/EPHA_outgoingstrength_perday.csv")
+incomingdays <- read_csv("~/EPHA_incomingstrength_perday.csv")
+outgoingdays <- read_csv("~/EPHA_outgoingstrength_perday.csv")
 
-incomingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/NOTCH_incomingstrength_perday.csv")
-outgoingdays <- read_csv("AQPhan/scRNA-seq/iPSC_Reprog/CellChat/NOTCH_outgoingstrength_perday.csv")
+incomingdays <- read_csv("~/NOTCH_incomingstrength_perday.csv")
+outgoingdays <- read_csv("~/NOTCH_outgoingstrength_perday.csv")
 
 incomingdays$Type = "Incoming Signaling"
 outgoingdays$Type = "Outgoing Signaling"
