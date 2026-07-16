@@ -1,4 +1,4 @@
-// DAPI-mask Protein Quantification
+// DAPI-mask protein quantification
 // by Nolan Origer
 
 // Setup Input and Output Directories
