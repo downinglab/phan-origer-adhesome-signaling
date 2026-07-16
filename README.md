@@ -1,8 +1,6 @@
 Code availability for Phan and Origer et al., _Mechanobiology_ 2026
 
-R scripts are organized by figure with small versions of our [GEO datasets](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE241274) available.
-
-ImageJ scripts are organized by purpose.
+Small version of our [GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE241274) is available in /R/data.
 
 ### Figure 1
 a,b) See [Cacchiarelli et al., _Cell_ (2015)](https://pubmed.ncbi.nlm.nih.gov/26186193/) and associated [GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE62777).
