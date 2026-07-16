@@ -7,7 +7,7 @@ ImageJ scripts are organized by purpose.
 ### Figure 1
 a,b) See [Cacchiarelli et al., _Cell_ (2015)](https://pubmed.ncbi.nlm.nih.gov/26186193/) and associated [GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE62777).
 
-d,e) See Supp. Tables 1 and 2.
+d,e) See Screen Barplots script and Supp. Tables 1 and 2.
 
 f) See iGraph script.
 
