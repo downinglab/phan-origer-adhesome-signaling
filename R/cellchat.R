@@ -1,4 +1,4 @@
-# Figure 3
+# Figure 3 and Supp Figure 5
 # By Andrew Phan
 
 rm(list=ls()) #clears variables
