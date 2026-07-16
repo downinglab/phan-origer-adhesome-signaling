@@ -5,7 +5,7 @@ Small version of our [GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cg
 ### Figure 1
 a,b) See [Cacchiarelli et al., _Cell_ (2015)](https://pubmed.ncbi.nlm.nih.gov/26186193/) and associated [GEO dataset](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE62777).
 
-d,e) See screen barplots script and Supp. Tables 1 and 2.
+d,e) See screen barplots script, ImageJ TRA-1-60+ colony count script, and Supp. Tables 1 and 2.
 
 f) See iGraph script.
 
@@ -29,7 +29,7 @@ f) Standard scanpy PAGA workflow.
 g,h) See MuTrans script.
 
 ### Supp. Figure 1
-a-d) See screen barplots script and Supp. Tables 1 and 2.
+a-d) See screen barplots script, ImageJ NANOG+ colony count script, and Supp. Tables 1 and 2.
 
 ### Supp. Figure 2
 a,b) See gene isoforms script and Supp. Table 3.
@@ -46,5 +46,8 @@ a,b) See CiP script and [Guan et al., _Nature_ (2022)](www.nature.com/articles/s
 ### Supp. Figure 5
 a-f) See CellChat script.
 
+### Supp. Figure 6
+g) See ImageJ protein quantification script.
 
-
+### Supp. Figure 7
+a-d) See MuTrans script.
