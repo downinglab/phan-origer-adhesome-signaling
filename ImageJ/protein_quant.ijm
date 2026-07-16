@@ -1,4 +1,5 @@
-// --- ImageJ/FIJI Macro: Consolidated 4-Channel Analysis with Group Tracking ---
+// DAPI-mask Protein Quantification
+// by Nolan Origer
 
 // Setup Input and Output Directories
 inputDir = getDirectory("Choose your INPUT folder containing .oir files");
