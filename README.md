@@ -46,6 +46,8 @@ a,b) See CiP script and [Guan et al., _Nature_ (2022)](www.nature.com/articles/s
 ### Supp. Figure 5
 a-f) See CellChat script.
 
+i) See Mean-CV plot script.
+
 ### Supp. Figure 6
 g) See ImageJ protein quantification script.
 
