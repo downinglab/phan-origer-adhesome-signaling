@@ -1,4 +1,4 @@
-# Supplemental Figure 1
+# Figure 1d,e and Supplemental Figure 1
 # By Nolan Origer
 
 # Load data
