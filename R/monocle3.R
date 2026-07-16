@@ -1,5 +1,4 @@
 # Figure 5 Monocle3 Pseudotime Trajectory Analysis
-# 10/5/21
 # By Andrew Phan
 
 library(Seurat)
@@ -7,7 +6,6 @@ library(monocle3)
 library(SeuratWrappers)
 library(viridis)
 library(dplyr)
-#/opt/R/4.2.0/lib/R/library
 
 rm(list=ls()) #clears variables
 cat("\014") #clears console
@@ -17,18 +15,7 @@ cat("\014") #clears console
 #Finally run the script at the end of the Seurat analysis R code.
 
 #import Seurat data
-# old combined:
-#load("~/DowningLab_Git/AQPhan/scRNA-seq/results_integration_iPSC_D6D9D12D15_LacZ&Shroom3KD.RData")
-# combined = AddModuleScore(combined, features = list(c("ACTA2", "TAGLN", "MYL9", "ID3")), name = "SMC.SIG")
-# combined = AddModuleScore(combined, features = list(c("TFAP2A", "SOX9", "HES1", "HOXA5", "NES", "NGFR")), name = "NCC.SIG")
-# combined = AddModuleScore(combined, features = list(c("NEUROG3", "NEUROD1", "NEUROG1", "POU3F2", "NHLH1")), name = "NEURAL.SIG")
-# combined = AddModuleScore(combined, features = list(c("POU5F1", "NANOG", "CDH1", "DNMT3A", "UTF1", "LIN28A", "NODAL", "LEFTY2")), name = "iPSC.SIG")
-# combined = AddModuleScore(combined, features = list(c("KRT8", "KRT18", "FBP1", "EPCAM")), name = "EPI.SIG")
-# combined = AddModuleScore(combined, features = list(c("UBE2C", "CENPF", "BIRC5", "TOP2A", "EED", "CCNB1", "ID1", "ETS2")), name = "TROPH.SIG")
-# combined = AddModuleScore(combined, features = list(c("CAV1", "COL5A2", "COL3A1", "TWIST1")), name = "FIBR.SIG")
-# combined = AddModuleScore(combined, features = list(c("CRABP1", "CRYAB", "NBEAL1", "S100A6", "PMEPA1")), name = "NEUREPI.SIG")
-#
-# combined <- FindClusters(combined, resolution = 0.44) #res of 0.43 or 0.44 makes 9 clusters. 0.44 a little cleaner
+load("~/hiF-T_small.RData")
 
 #plot a single gene signature score over pseudotime with a loess
 #Input: dataframe with pseudotime and gene signature values; the column name for the x axis; the column name for the y axis; the number of breaks for the bins on the x axis [NOTE: TOO MANY BREAKS WILL PREVENT LOESS LINE FROM PLOTTING CORRECTLY]; a loess span value [Default=0.2]
@@ -50,17 +37,10 @@ plot_GeneSigScore <- function(df, x = "Pseudotime", y, breaks=50, span=0.2, ylim
   lines(df[[x]][j],lw1$fitted[j],col="red",lwd=3)
 }
 
-load("/home/data/aqphan/RStudio/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/Seurat/combined_10clust+signatures.rdata") #load seurat object
-
-#add PCP and EMT module scores
-combined = AddModuleScore(combined, features = list(c("WNT5A", "VANGL2", "FZD3", "DVL2", "CELSR1", "PRICKLE1", "FZD7", "WNT11", "DVL1")), name = "PCP.PATHWAY")
-combined = AddModuleScore(combined, features = list(c("BMP4", "SOX9", "SNAI2", "CDH2", "CDH11")), name = "EMT")
-
-
 DimPlot(combined, reduction = "umap")
 #separate conditions
-s3seurat = subset(x = combined, subset = Condition == "Shroom3")
-lacZseurat = subset(x = combined, subset = Condition == "LacZ")
+s3seurat = subset(x = combined, subset = Condition == "SHROOM3 KD")
+lacZseurat = subset(x = combined, subset = Condition == "lacZ KD")
 
 #add finalized clusters as metadata to each object
 s3seurat <- AddMetaData(
@@ -357,18 +337,6 @@ j <- order(df$Pseudotime)
 lines(df$Pseudotime[j],lw1$fitted[j],col="red",lwd=3)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 ######## ATTEMPT TO RUN DIFFERENTIAL GENE EXPRESSION ANALYSES IN MONOCLE3; DOES NOT CARRY OVER ALL NECESSARY DATA WITH SEURATWRAPPERS #############
 #try adding pseudotime to column in seurat. then remake cds and try running
 lacZseurat <- AddMetaData(
@@ -441,8 +409,6 @@ pheatmap::pheatmap(agg_mat, cluster_rows=TRUE, cluster_cols=TRUE,
 ncctraj_cds <- estimate_size_factors(ncctraj_cds)
 ncctraj_cds@rowRanges@elementMetadata@listData[["gene_short_name"]] <- rownames(s3seurat[["RNA"]])
 
-
-
 plot_cells(ncctraj_cds,
            genes=gene_module_df,
            group_cells_by="partition",
@@ -454,26 +420,4 @@ plot_cells(ncctraj_cds,
            group_cells_by="partition",
            color_cells_by="partition",
            show_trajectory_graph=FALSE)
-
-##################################
-
-#https://satijalab.org/signac/articles/monocle.html
-#how to add pseudotime metadata to seurat object
-bone <- AddMetaData(
-  object = bone,
-  metadata = erythroid.cds@principal_graph_aux@listData$UMAP$pseudotime,
-  col.name = "Erythroid"
-)
-
-FeaturePlot(bone, c("Erythroid", "Lymphoid"), pt.size = 0.1) & scale_color_viridis_c()
-
-# s3cds = cds
-# s3df = df
-# s3dfzscore = dfzscore
-# save(s3cds, s3df, s3dfzscore, file = "~/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/Monocle3/Saved_Objs/s3_monocle+dfs.RDATA")
-#
-# lacZcds = cds
-# lacZdf = df
-# lacZdfzscore = dfzscore
-# save(lacZcds, lacZdf, lacZdfzscore, file = "~/DowningLab_Git/AQPhan/scRNA-seq/iPSC_Reprog/Monocle3/Saved_Objs/lacZ_monocle+dfs.RDATA")
 
